@@ -42,9 +42,4 @@ runs:
         "https://api.github.com/repos/${{ github.repository }}/actions/workflows/${{ env.WORKFLOW_ID }}/runs?per_page=1&status=completed&branch=${{ env.BRANCH_NAME }}" \
         | jq -r .workflow_runs[0].conclusion)
         echo "Status of the previous build: $last_status"
-        if [[ $last_status == failure ]]
-        then
-           echo "::set-output name=last_status::failure"
-        else
-           echo "::set-output name=last_status::success"
-        fi
+        echo "::set-output name=last_status::${last_status}"
