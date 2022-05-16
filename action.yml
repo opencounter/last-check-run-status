@@ -1,45 +1,52 @@
-name: 'Get status of last workflow'
-description: 'Get conclusion of last workflow run on current branch.'
+name: 'Get recent Check Run status'
+description: 'Get conclusion of recent Check Run'
+
 branding:
   icon: 'arrow-left'
   color: 'yellow'
+
 inputs:
   github_token:
     description: Secret GitHub API token to use for making API requests.
     default: ${{ github.token }}
     required: true
+  branch:
+    description: Branch filter for selecting Check Runs
+  check_run_name:
+    description: Name of the Check Run to select
+  nth_most_recent:
+    description: If this action is used in a context triggered by a check-run event, it may be desireable to skip the most recent. (1 = most recent, 2 = second most recent, etc.)
+    default: 1
+
 outputs:
   last_status:
-    description: "Conclusion of last workflow run on current branch"
+    description: "Conclusion of selected Check Run"
     value: ${{ steps.last_status.outputs.last_status }}
+
 runs:
   using: "composite"
   steps:
     - name: Get branch name
       shell: bash
+      env:
+        BRANCH_NAME: ${{ inputs.branch }}
       run: |
+        [[ -n ${BRANCH_NAME} ]] && exit
         if [[ ${GITHUB_EVENT_NAME} == "pull_request" ]]
         then
            echo "BRANCH_NAME=$(echo ${GITHUB_HEAD_REF} | tr / -)" >> $GITHUB_ENV
         else
            echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr / -)" >> $GITHUB_ENV
         fi
-        echo "Branch name: ${GITHUB_HEAD_REF}"
-    - name: Get workflow id
-      shell: bash
-      run: |
-        WORKFLOW_ID=$(curl --header 'authorization: Bearer ${{ inputs.github_token }}' \
-                           --header 'content-type: application/json' \
-        https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }} | jq -r .workflow_id)
-        echo "WORKFLOW_ID=$WORKFLOW_ID" >> $GITHUB_ENV
-        echo "Workflow id: ${WORKFLOW_ID}"
-    - name: Get previous build status
+
+    - name: Get previous Check Run status
       shell: bash
       id: last_status
       run: |
-        last_status=$(curl --silent --header 'authorization: Bearer ${{ inputs.github_token }}' \
-                                    --header 'content-type: application/json' \
-        "https://api.github.com/repos/${{ github.repository }}/actions/workflows/${{ env.WORKFLOW_ID }}/runs?per_page=1&status=completed&branch=${{ env.BRANCH_NAME }}" \
-        | jq -r .workflow_runs[0].conclusion)
+        last_status=$( curl --silent
+          --header 'authorization: Bearer ${{ inputs.github_token }}' \
+          --header 'content-type: application/json' \
+          "https://api.github.com/repos/${{ github.repository }}/commits/${BRANCH_NAME}/check-runs?check_name=${{ inputs.check_run_name }}&filter=all \
+        | jq -r '.check_runs | nth(-${{ inputs.nth_most_recent }}) | .conclusion')
         echo "Status of the previous build: $last_status"
         echo "::set-output name=last_status::${last_status}"
