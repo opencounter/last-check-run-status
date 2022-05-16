@@ -14,6 +14,7 @@ inputs:
     description: Branch filter for selecting Check Runs
   check_run_name:
     description: Name of the Check Run to select
+    required: true
   nth_most_recent:
     description: If this action is used in a context triggered by a check-run event, it may be desireable to skip the most recent. (1 = most recent, 2 = second most recent, etc.)
     default: 1
